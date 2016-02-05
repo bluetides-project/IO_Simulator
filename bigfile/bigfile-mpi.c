@@ -101,7 +101,7 @@ int big_block_mpi_close(BigBlock * block, MPI_Comm comm) {
         }
     } else {
         block->dirty = 0;
-        block->attrs->dirty = 0;
+        block->attrset.dirty = 0;
     }
     rt = big_block_close(block);
     if(rt) {
