@@ -20,12 +20,6 @@ usage()
 }
 
 static void 
-sim(int Nfiles, int Nwriters, size_t bytesperrank) 
-{
-    size_t size = bytesperrank / 4;
-}
-
-static void 
 info(char * fmt, ...) {
 
     static double t0 = -1.0;
@@ -43,6 +37,27 @@ info(char * fmt, ...) {
     }
 }
 
+static void 
+sim(int Nfile, int Nwriter, size_t bytesperrank, char * filename) 
+{
+    size_t size = bytesperrank / 4;
+
+    info("Writing to `%s`\n", filename);
+    info("Physical Files %d\n", Nfile);
+    info("Ranks %d\n", NTask);
+    info("Writers %d\n", Nwriter);
+    info("Bytes Per Rank %td\n", size * 4);
+
+    BigFile bf = {0};
+    BigBlock bb = {0};
+    big_file_mpi_create(&bf, filename, MPI_COMM_WORLD);
+    big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, size * NTask, MPI_COMM_WORLD);
+
+    big_block_mpi_close(&bb, MPI_COMM_WORLD);
+    big_file_mpi_close(&bf, MPI_COMM_WORLD);
+}
+
+
 int main(int argc, char * argv[]) {
     MPI_Init(&argc, &argv);
     
@@ -50,21 +65,21 @@ int main(int argc, char * argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &NTask);
 
     int ch;
-    int Nfiles = 1;
-    int Nwriters = NTask;
+    int Nfile = 1;
+    int Nwriter = NTask;
     size_t bytesperrank = 1024;
     char * filename;
 
     while(-1 != (ch = getopt(argc, argv, "hN:n:s:"))) {
         switch(ch) {
             case 'N':
-                if(1 != sscanf(optarg, "%d", &Nfiles)) {
+                if(1 != sscanf(optarg, "%d", &Nfile)) {
                     usage();
                     goto byebye;
                 }
                 break;
             case 'n':
-                if(1 != sscanf(optarg, "%d", &Nwriters)) {
+                if(1 != sscanf(optarg, "%d", &Nwriter)) {
                     usage();
                     goto byebye;
                 }
@@ -86,8 +101,7 @@ int main(int argc, char * argv[]) {
         goto byebye;
     }
     filename = argv[optind];
-
-    info("Writing to `%s`\n", filename);
+    sim(Nfile, Nwriter, bytesperrank, filename);
 
 byebye:
     MPI_Finalize();
