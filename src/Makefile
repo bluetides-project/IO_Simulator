@@ -9,6 +9,6 @@ iosim : $(IOSIM_OBJECTS)
 	$(MPICC) -o $@ $^
 
 %.o : %.c
-	$(MPICC) $(CFLAGS) -c -o $@ $^
+	$(MPICC) -I../bigfile $(CFLAGS) -c -o $@ $^
 
 
