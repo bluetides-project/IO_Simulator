@@ -24,6 +24,8 @@ info(char * fmt, ...) {
 
     static double t0 = -1.0;
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     if(t0 < 0) t0 = MPI_Wtime();
 
     char * buf = alloca(strlen(fmt) + 100);
@@ -50,11 +52,21 @@ sim(int Nfile, int Nwriter, size_t bytesperrank, char * filename)
 
     BigFile bf = {0};
     BigBlock bb = {0};
-    big_file_mpi_create(&bf, filename, MPI_COMM_WORLD);
-    big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, size * NTask, MPI_COMM_WORLD);
 
+    info("Creating BigFile\n");
+    big_file_mpi_create(&bf, filename, MPI_COMM_WORLD);
+    info("Created BigFile\n");
+
+    info("Creating BigBlock\n");
+    big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, size * NTask, MPI_COMM_WORLD);
+    info("Created BigBlock\n");
+
+    info("Closing BigBlock\n");
     big_block_mpi_close(&bb, MPI_COMM_WORLD);
+    info("Closed BigBlock\n");
+    info("Closing BigFile\n");
     big_file_mpi_close(&bf, MPI_COMM_WORLD);
+    info("Closed BigFile\n");
 }
 
 
