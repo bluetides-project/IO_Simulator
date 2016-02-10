@@ -1,0 +1,39 @@
+------------------------------------------------------
+Job is running on node compute-2-1
+compute-2-1
+compute-2-1
+compute-2-1
+------------------------------------------------------
+PBS: qsub is running on coma.hpc1.cs.cmu.edu
+PBS: originating queue is bigmem
+PBS: executing queue is bigmem
+PBS: working directory is /home/mscheuch/IO_Simulator/src
+PBS: execution mode is PBS_BATCH
+PBS: job identifier is 580499.coma.hpc1.cs.cmu.edu
+PBS: job name is IO-SIMULATOR
+PBS: node file is /var/spool/torque/aux//580499.coma.hpc1.cs.cmu.edu
+PBS: current home directory is /home/mscheuch
+PBS: PATH = /opt/openmpi/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ganglia/bin:/opt/ganglia/sbin:/usr/java/latest/bin:/opt/maui/bin:/opt/torque/bin:/opt/torque/sbin:/opt/pdsh/bin:/opt/rocks/bin:/opt/rocks/sbin:/opt/dell/srvadmin/bin:/home/mscheuch/bin
+------------------------------------------------------
+ 
+ 
+[000000.000] Writing to `TestFile-81-4-81000`
+[000000.000] Physical Files 81
+[000000.000] Ranks 1
+[000000.000] Writers 4
+[000000.000] Bytes Per Rank 324000
+[000000.000] Items Per Rank 81000
+[000000.000] Creating BigFile
+[000000.001] Created BigFile
+[000000.001] Creating BigBlock
+[000000.085] Created BigBlock
+[000000.085] Initializing FakeData
+[000000.086] Initialized FakeData
+[000000.086] Writing BigBlock
+[000000.086] Writing Round 0
+[000001.117] Written BigBlock
+[000001.117] Writing took 0 seconds
+[000001.117] Closing BigBlock
+[000001.134] Closed BigBlock
+[000001.134] Closing BigFile
+[000001.134] Closed BigFile
