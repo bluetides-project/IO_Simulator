@@ -118,7 +118,7 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
             big_block_seek(&bb, &ptr, itemsperrank * ThisTask);
             big_block_write(&bb, &ptr, &array);
             double t1 = MPI_Wtime();
-            twrite += t1 - t1;
+            twrite += t1 - t0;
         }
         info("Written BigBlock\n");
         info("Writing took %g seconds\n", twrite);
@@ -134,7 +134,7 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
             big_block_seek(&bb, &ptr, itemsperrank * ThisTask);
             big_block_read(&bb, &ptr, &array);
             double t1 = MPI_Wtime();
-            twrite += t1 - t1;
+            twrite += t1 - t0;
         }
         info("Read BigBlock\n");
         info("Reading took %g seconds\n", twrite);
