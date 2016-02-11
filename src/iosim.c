@@ -121,7 +121,7 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
             twrite += t1 - t0;
         }
         info("Written BigBlock\n");
-        info("Writing took %g seconds\n", twrite);
+        info("Writing took %f seconds\n", twrite);
     }  else {
         info("Reading BigBlock\n");
         double twrite = 0;
@@ -137,7 +137,7 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
             twrite += t1 - t0;
         }
         info("Read BigBlock\n");
-        info("Reading took %g seconds\n", twrite);
+        info("Reading took %f seconds\n", twrite);
 
     }
     info("Closing BigBlock\n");
