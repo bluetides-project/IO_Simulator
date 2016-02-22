@@ -17,8 +17,8 @@ static void
 usage() 
 {
     if(ThisTask != 0) return;
-    printf("usage: iosim [-N nfiles] [-n numwriters] [-s itemsperrank] [-m (create|update|read)] filename\n");
-    printf("Defaults: -N 1 -n NTask -s 1 -m create\n");
+    printf("usage: iosim [-N nfiles] [-n numwriters] [-s items] [-w width] [-m (create|update|read)] filename\n");
+    printf("Defaults: -N 1 -n NTask -s 1 -w 1 -m create\n");
 }
 
 static void 
@@ -46,14 +46,14 @@ info(char * fmt, ...) {
 #define MODE_UPDATE 2
 
 static void 
-sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
+sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename, int mode)
 {
     info("Writing to `%s`\n", filename);
     info("Physical Files %d\n", Nfile);
     info("Ranks %d\n", NTask);
     info("Writers %d\n", Nwriter);
-    info("Bytes Per Rank %td\n", itemsperrank * 4);
-    info("Items Per Rank %td\n", itemsperrank);
+    info("Bytes Per Rank %td\n", Nitems * 4 / NTask);
+    info("Items Per Rank %td\n", Nitems / NTask);
 
     BigFile bf = {0};
     BigBlock bb = {0};
@@ -78,7 +78,7 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
         info("Created BigFile\n");
 
         info("Creating BigBlock\n");
-        big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, itemsperrank * NTask, MPI_COMM_WORLD);
+        big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, Nitems, MPI_COMM_WORLD);
         info("Created BigBlock\n");
     }  else {
         info("Opening BigFile\n");
@@ -88,9 +88,10 @@ sim(int Nfile, int Nwriter, size_t itemsperrank, char * filename, int mode)
         info("Opening BigBlock\n");
         big_file_mpi_open_block(&bf, &bb, "TestBlock", MPI_COMM_WORLD);
         info("Opened BigBlock\n");
-        if(bb.size != itemsperrank * NTask) {
-            info("Size mismatched, overriding itemsperrank = %td\n", bb.size);
-            itemsperrank = bb.size / NTask;
+        if(bb.size != Nitems) {
+            info("Size mismatched, overriding Nitems = %td\n", bb.size);
+            Nitems = bb.size;
+            itemsperrank = Nitems / NTask;
         }
         if(bb.Nfile != Nfile) {
             info("Nfile mismatched, overriding Nfile = %d\n", bb.Nfile );
@@ -159,13 +160,15 @@ int main(int argc, char * argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &NTask);
 
     int ch;
+    int width = 1;
     int Nfile = 1;
     int Nwriter = NTask;
+    size_t Nitems = 1024;
     size_t itemsperrank = 1024;
     char * filename;
     int mode = MODE_CREATE;
 
-    while(-1 != (ch = getopt(argc, argv, "hN:n:s:m:"))) {
+    while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:m:"))) {
         switch(ch) {
             case 'm':
                 if(0 == strcmp(optarg, "read")) {
@@ -177,6 +180,12 @@ int main(int argc, char * argv[]) {
                 if(0 == strcmp(optarg, "update")) {
                     mode = MODE_UPDATE;
                 } else {
+                    usage();
+                    goto byebye;
+                }
+                break;
+            case 'w':
+                if(1 != sscanf(optarg, "%d", &width)) {
                     usage();
                     goto byebye;
                 }
@@ -194,7 +203,7 @@ int main(int argc, char * argv[]) {
                 }
                 break;
             case 's':
-                if(1 != sscanf(optarg, "%td", &itemsperrank)) {
+                if(1 != sscanf(optarg, "%td", &Nitems)) {
                     usage();
                     goto byebye;
                 }
@@ -210,7 +219,13 @@ int main(int argc, char * argv[]) {
         goto byebye;
     }
     filename = argv[optind];
-    sim(Nfile, Nwriter, itemsperrank, filename, mode);
+    Nitems *= width;
+    if (Nitems % NTask != 0) {
+        Nitems -= Nitems % NTask;
+        info("#items not divisible by ranks!\n Overriding total#items = %td\n", Nitems);
+    }
+    itemsperrank = Nitems / NTask;
+    sim(Nfile, Nwriter, Nitems, itemsperrank, filename, mode);
 
 byebye:
     MPI_Finalize();
