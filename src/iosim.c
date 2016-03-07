@@ -17,8 +17,8 @@ static void
 usage() 
 {
     if(ThisTask != 0) return;
-    printf("usage: iosim [-N nfiles] [-n numwriters] [-s items] [-w width] [-m (create|update|read)] filename\n");
-    printf("Defaults: -N 1 -n NTask -s 1 -w 1 -m create\n");
+    printf("usage: iosim [-N nfiles] [-n numwriters] [-s items] [-w width] [-p path] [-m (create|update|read)] filename\n");
+    printf("Defaults: -N 1 -n NTask -s 1 -w 1 -p <dir> -m create \n");
 }
 
 static void 
@@ -46,7 +46,7 @@ info(char * fmt, ...) {
 #define MODE_UPDATE 2
 
 static void 
-sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename, int mode)
+sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks, int mode) //
 {
     info("Writing to `%s`\n", filename);
     info("Physical Files %d\n", Nfile);
@@ -55,6 +55,9 @@ sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename,
     info("Bytes Per Rank %td\n", Nitems * 4 / NTask);
     info("Items Per Rank %td\n", Nitems / NTask);
 
+    size_t itemsperrank = 1024;
+    itemsperrank = Nitems / NTask;
+    
     BigFile bf = {0};
     BigBlock bb = {0};
     BigArray array = {0};
@@ -112,7 +115,7 @@ sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename,
         double twrite = 0;
         for(i = 0; i < GroupSize; i ++) {
             MPI_Barrier(COMM_SPLIT);
-            info("Writing Round %d\n", i);
+            //info("Writing Round %d\n", i+1);
             if (i != GroupRank) continue;
 
             double t0 = MPI_Wtime();
@@ -123,12 +126,32 @@ sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename,
         }
         info("Written BigBlock\n");
         info("Writing took %f seconds\n", twrite);
-    }  else {
+
+        //+++++++++++++++++ Preparing Time Log using MPI_Send & MPI_Recv +++++++++++++++++
+/*        if(ThisTask != 0) {
+            MPI_Send(&twrite, 1, MPI_DOUBLE, 0, ThisTask, MPI_COMM_WORLD);
+        } else if (ThisTask == 0) {
+            tlog_ranks[ThisTask] = twrite;
+            for (i=1; i<NTask; i++) {
+            MPI_Status status;
+            MPI_Recv(&twrite, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            tlog_ranks[status.MPI_SOURCE] = twrite;
+            }
+        }
+*/
+        //+++++++++++++++++ Now using MPI_Gather +++++++++++++++++
+
+        MPI_Gather(&twrite, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+        //+++++++++++++++++ END +++++++++++++++++
+
+    }
+    else {
         info("Reading BigBlock\n");
         double twrite = 0;
         for(i = 0; i < GroupSize; i ++) {
             MPI_Barrier(COMM_SPLIT);
-            info("Reading Round %d\n", i);
+            //info("Reading Round %d\n", i);
             if (i != GroupRank) continue;
 
             double t0 = MPI_Wtime();
@@ -139,7 +162,9 @@ sim(int Nfile, int Nwriter, size_t Nitems, size_t itemsperrank, char * filename,
         }
         info("Read BigBlock\n");
         info("Reading took %f seconds\n", twrite);
-
+        
+        //+++++++++++++++++ Preparing Time Log variable +++++++++++++++++
+        MPI_Gather(&twrite, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
     info("Closing BigBlock\n");
     big_block_mpi_close(&bb, MPI_COMM_WORLD);
@@ -158,17 +183,24 @@ int main(int argc, char * argv[]) {
     
     MPI_Comm_rank(MPI_COMM_WORLD, &ThisTask);
     MPI_Comm_size(MPI_COMM_WORLD, &NTask);
-
+    
+    int i;
     int ch;
     int width = 1;
     int Nfile = 1;
     int Nwriter = NTask;
     size_t Nitems = 1024;
-    size_t itemsperrank = 1024;
-    char * filename;
+    char * filename = alloca(1500);
+    char * path = "";
+    char * postfix = alloca(1500);
     int mode = MODE_CREATE;
+    //+++++++++++++++++ Timelog +++++++++++++++++
+    char * timelog = alloca(1000);
+    double * tlog_ranks;
+    tlog_ranks = (double *) malloc(sizeof(double)*NTask);
+    FILE *F;
 
-    while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:m:"))) {
+    while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:p:m:"))) {
         switch(ch) {
             case 'm':
                 if(0 == strcmp(optarg, "read")) {
@@ -180,6 +212,13 @@ int main(int argc, char * argv[]) {
                 if(0 == strcmp(optarg, "update")) {
                     mode = MODE_UPDATE;
                 } else {
+                    usage();
+                    goto byebye;
+                }
+                break;
+            case 'p':
+                path = optarg;
+                if( path[0] == '-') {
                     usage();
                     goto byebye;
                 }
@@ -218,17 +257,45 @@ int main(int argc, char * argv[]) {
         usage();
         goto byebye;
     }
-    filename = argv[optind];
+
+//+++++++++++++++++ Filename and checks of input parameters +++++++++++++++++
+    sprintf(postfix, "_files%d_ranks%d_writers%d_items%td_of_width%d",
+             Nfile, NTask, Nwriter, Nitems, width);
+    sprintf(filename, "%s%s%s", path, argv[optind], postfix);
     Nitems *= width;
     if (Nitems % NTask != 0) {
         Nitems -= Nitems % NTask;
         info("#items not divisible by ranks!\n Overriding total#items = %td\n", Nitems);
     }
-    itemsperrank = Nitems / NTask;
-    sim(Nfile, Nwriter, Nitems, itemsperrank, filename, mode);
+    if (Nwriter > NTask) {
+        info("\n\n ############## CAUTION: you chose %d ranks and %d writers! ##############\n"
+             " #  If you want %d writers, allocate at least %d ranks with <mpirun -n %d> #\n"
+             " ################### Can only use %d writers instead! ###################\n\n",
+             NTask, Nwriter, Nwriter, Nwriter, Nwriter, NTask);
+        Nwriter = NTask;
+    }
+    
+//+++++++++++++++++ Starting Simulation +++++++++++++++++
+    sim(Nfile, Nwriter, Nitems, filename, tlog_ranks, mode);
+
+//+++++++++++++++++ Writing Time Log +++++++++++++++++
+    sprintf(timelog, "%s/Timelog%s", filename, postfix);
+    F = fopen(timelog, "a+");
+    if (!F){
+        info("iosim.c: Couldn't open file %s for writting!\n", timelog);
+    }
+    else{
+        if (ThisTask == 0){
+            for (i=0; i<NTask; i++) {
+                fprintf(F, "Task=%d\ttwrite=\t%f\n", i, tlog_ranks[i]);
+            }
+        }
+        fclose(F);
+    }
 
 byebye:
     MPI_Finalize();
-    return 0;
+//    free(filename); free(timelog);
+    free(tlog_ranks);
     return 0;
 }
