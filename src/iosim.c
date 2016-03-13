@@ -45,8 +45,23 @@ info(char * fmt, ...) {
 #define MODE_READ   1
 #define MODE_UPDATE 2
 
+typedef struct log{
+    double * create;
+    double * open;
+    double * write;
+    double * read;
+    double * close;
+} log;
+typedef struct times{
+    double create;
+    double open;
+    double write;
+    double read;
+    double close;
+} times;
+
 static void 
-sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks, int mode) //
+sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks, log tlog, int mode)
 {
     info("Writing to `%s`\n", filename);
     info("Physical Files %d\n", Nfile);
@@ -65,6 +80,12 @@ sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks,
 
     int * fakedata;
     ptrdiff_t i;
+    
+    double tcreate, topen, twrite, tread, tclose;
+    tcreate = topen = twrite = tread = tclose = 0;
+    double t0, t1;
+    times trank;
+    trank.create = trank.open = trank.write = trank.read = trank.close = 0;
 
     int color = ThisTask * Nwriter / NTask;
     MPI_Comm COMM_SPLIT;
@@ -77,19 +98,35 @@ sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks,
 
     if(mode == MODE_CREATE) {
         info("Creating BigFile\n");
+        t0 = MPI_Wtime();
         big_file_mpi_create(&bf, filename, MPI_COMM_WORLD);
+        t1 = MPI_Wtime();
+        tcreate += t1 - t0;
+        trank.create += t1 - t0;
         info("Created BigFile\n");
 
         info("Creating BigBlock\n");
+        t0 = MPI_Wtime();
         big_file_mpi_create_block(&bf, &bb, "TestBlock", "i4", 1, Nfile, Nitems, MPI_COMM_WORLD);
+        t1 = MPI_Wtime();
+        tcreate += t1 - t0;
+        trank.create += t1 - t0;
         info("Created BigBlock\n");
     }  else {
         info("Opening BigFile\n");
+        t0 = MPI_Wtime();
         big_file_mpi_open(&bf, filename, MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
+        topen += t1 - t0;
+        trank.open += t1 - t0;
         info("Opened BigFile\n");
 
         info("Opening BigBlock\n");
+        t0 = MPI_Wtime();
         big_file_mpi_open_block(&bf, &bb, "TestBlock", MPI_COMM_WORLD);
+        t0 = MPI_Wtime();
+        topen += t1 - t0;
+        trank.open += t1 - t0;
         info("Opened BigBlock\n");
         if(bb.size != Nitems) {
             info("Size mismatched, overriding Nitems = %td\n", bb.size);
@@ -112,68 +149,95 @@ sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks,
 
     if(mode == MODE_CREATE || mode == MODE_UPDATE) {
         info("Writing BigBlock\n");
-        double twrite = 0;
+        twrite = 0;
         for(i = 0; i < GroupSize; i ++) {
             MPI_Barrier(COMM_SPLIT);
             //info("Writing Round %d\n", i+1);
             if (i != GroupRank) continue;
 
-            double t0 = MPI_Wtime();
+            t0 = MPI_Wtime();
             big_block_seek(&bb, &ptr, itemsperrank * ThisTask);
             big_block_write(&bb, &ptr, &array);
-            double t1 = MPI_Wtime();
+            t1 = MPI_Wtime();
             twrite += t1 - t0;
+            trank.write += t1 - t0;
         }
         info("Written BigBlock\n");
         info("Writing took %f seconds\n", twrite);
 
-        //+++++++++++++++++ Preparing Time Log using MPI_Send & MPI_Recv +++++++++++++++++
-/*        if(ThisTask != 0) {
-            MPI_Send(&twrite, 1, MPI_DOUBLE, 0, ThisTask, MPI_COMM_WORLD);
-        } else if (ThisTask == 0) {
-            tlog_ranks[ThisTask] = twrite;
-            for (i=1; i<NTask; i++) {
-            MPI_Status status;
-            MPI_Recv(&twrite, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            tlog_ranks[status.MPI_SOURCE] = twrite;
-            }
-        }
-*/
-        //+++++++++++++++++ Now using MPI_Gather +++++++++++++++++
-
-        MPI_Gather(&twrite, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-        //+++++++++++++++++ END +++++++++++++++++
-
     }
     else {
         info("Reading BigBlock\n");
-        double twrite = 0;
+        twrite = 0;
         for(i = 0; i < GroupSize; i ++) {
             MPI_Barrier(COMM_SPLIT);
             //info("Reading Round %d\n", i);
             if (i != GroupRank) continue;
 
-            double t0 = MPI_Wtime();
+            t0 = MPI_Wtime();
             big_block_seek(&bb, &ptr, itemsperrank * ThisTask);
             big_block_read(&bb, &ptr, &array);
-            double t1 = MPI_Wtime();
-            twrite += t1 - t0;
+            t1 = MPI_Wtime();
+            tread += t1 - t0;
+            trank.read += t1 - t0;
         }
         info("Read BigBlock\n");
         info("Reading took %f seconds\n", twrite);
         
-        //+++++++++++++++++ Preparing Time Log variable +++++++++++++++++
-        MPI_Gather(&twrite, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     }
+    
     info("Closing BigBlock\n");
+    t0 = MPI_Wtime();
     big_block_mpi_close(&bb, MPI_COMM_WORLD);
+    t1 = MPI_Wtime();
+    tclose += t1 - t0;
+    trank.close += t1 - t0;
     info("Closed BigBlock\n");
 
     info("Closing BigFile\n");
+    t0 = MPI_Wtime();
     big_file_mpi_close(&bf, MPI_COMM_WORLD);
+    t1 = MPI_Wtime();
+    tclose += t1 - t0;
+    trank.close += t1 - t0;
     info("Closed BigFile\n");
 
+    //+++++++++++++++++ Preparing Time Log using MPI_Send & MPI_Recv +++++++++++++++++
+    /*        if(ThisTask != 0) {
+     MPI_Send(&twrite, 1, MPI_DOUBLE, 0, ThisTask, MPI_COMM_WORLD);
+     } else if (ThisTask == 0) {
+     tlog_ranks[ThisTask] = twrite;
+     for (i=1; i<NTask; i++) {
+     MPI_Status status;
+     MPI_Recv(&twrite, 1, MPI_DOUBLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+     tlog_ranks[status.MPI_SOURCE] = twrite;
+     }
+     }
+     */
+    //+++++++++++++++++ Now using MPI_Gather +++++++++++++++++
+
+    //MPI_Gather(&tcreate, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Gather(&topen, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Gather(&twrite, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Gather(&tread, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //MPI_Gather(&tclose, 1, MPI_DOUBLE, tlog_ranks, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+/*    MPI_Gather(&trank.create, 1, MPI_DOUBLE, tlog->create, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.open, 1, MPI_DOUBLE, tlog->open, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.write, 1, MPI_DOUBLE, tlog->write, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.read, 1, MPI_DOUBLE, tlog->read, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.close, 1, MPI_DOUBLE, tlog->close, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+*/
+    MPI_Gather(&trank.create, 1, MPI_DOUBLE, tlog.create, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.open, 1, MPI_DOUBLE, tlog.open, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.write, 1, MPI_DOUBLE, tlog.write, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.read, 1, MPI_DOUBLE, tlog.read, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(&trank.close, 1, MPI_DOUBLE, tlog.close, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    //MPI_Gather(&trank, 5, MPI_DOUBLE, tlog, 5, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    //+++++++++++++++++ END +++++++++++++++++
+    
+    
     MPI_Comm_free(&COMM_SPLIT);
     free(fakedata);
 }
@@ -196,9 +260,11 @@ int main(int argc, char * argv[]) {
     int mode = MODE_CREATE;
     //+++++++++++++++++ Timelog +++++++++++++++++
     char * timelog = alloca(1000);
-    double * tlog_ranks;
-    tlog_ranks = (double *) malloc(sizeof(double)*NTask);
+    double * tlog_ranks = (double *) malloc(sizeof(double)*NTask);
     FILE *F;
+    log tlog;
+    tlog.create = tlog.open = tlog.write = tlog.read = tlog.close = (double *) malloc(sizeof(double)*NTask);
+    //tlog->create = tlog->open = tlog->write = tlog->read = tlog->close = (double *) malloc(sizeof(double)*NTask);
 
     while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:p:m:"))) {
         switch(ch) {
@@ -276,7 +342,7 @@ int main(int argc, char * argv[]) {
     }
     
 //+++++++++++++++++ Starting Simulation +++++++++++++++++
-    sim(Nfile, Nwriter, Nitems, filename, tlog_ranks, mode);
+    sim(Nfile, Nwriter, Nitems, filename, tlog_ranks, tlog, mode);
 
 //+++++++++++++++++ Writing Time Log +++++++++++++++++
     sprintf(timelog, "%s/Timelog%s", filename, postfix);
@@ -286,16 +352,20 @@ int main(int argc, char * argv[]) {
     }
     else{
         if (ThisTask == 0){
+            //fprintf(F, "Task\tTwrite\t\tTlog.write\n");
+            fprintf(F, "Task\tTcreate\t\tTopen\t\tTwrite\t\tTread\t\tTclose\n");
             for (i=0; i<NTask; i++) {
-                fprintf(F, "Task=%d\ttwrite=\t%f\n", i, tlog_ranks[i]);
+                //fprintf(F, "%d\t%f\t%f\n", i, tlog_ranks[i], tlog.write[i]);
+                fprintf(F, "%d\t%f\t%f\t%f\t%f\t%f\n", i, tlog.create[i], tlog.open[i], tlog.write[i], tlog.read[i], tlog.close[i]);
+                //fprintf(F, "%d\t%f\t%f\t%f\t%f\t%f\n", i, tlog->create[i], tlog->open[i], tlog->write[i], tlog->read[i], tlog->close[i]);
             }
         }
         fclose(F);
     }
 
 byebye:
-    MPI_Finalize();
-//    free(filename); free(timelog);
     free(tlog_ranks);
+    free(tlog.create);free(tlog.open);free(tlog.write);free(tlog.read);free(tlog.close);
+    MPI_Finalize();
     return 0;
 }
