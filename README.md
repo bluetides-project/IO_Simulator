@@ -10,7 +10,9 @@ mpirun -n 64 ./iosim -N 4000 -n 64 -s 800000 -w 3 -p ./ -m create -d Test
  -n ... number of ranks
 
 ++++++++++ iosim +++++++++++
+
  'Test' ... filename
+ 
  -d ... flag to delete files after complete run
  
  -m ... mode: <create/update/read> of files
