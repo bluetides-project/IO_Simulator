@@ -17,7 +17,7 @@ static void
 usage() 
 {
     if(ThisTask != 0) return;
-    printf("usage: iosim [-N nfiles] [-n numwriters] [-s items] [-w width] [-p path] [-m (create|update|read)] filename\n");
+    printf("usage: iosim [-N nfiles] [-n numwriters] [-s items] [-w width] [-p path] [-m (create|update|read)] [-d (to delete fakedata afterwards)] filename\n");
     printf("Defaults: -N 1 -n NTask -s 1 -w 1 -p <dir> -m create \n");
 }
 
@@ -89,8 +89,8 @@ sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks,
 /*    MPI_Datatype MPI_TIMELOG;
     MPI_Aint displacement[nel_trank], dblex;
     MPI_Type_extent(MPI_DOUBLE, &dblex);
-    //displacement[0] = static_cast<MPI_Aint>(0);
-    for (i=0; i < nel_trank; i ++) displacement[i] = i*dblex;
+    displacement[0] = (MPI_Aint)0;
+    for (i=1; i < nel_trank; i ++) displacement[i] = i*dblex;
     MPI_Type_struct( 1, nel_trank, displacement, MPI_DOUBLE, &MPI_TIMELOG);
     MPI_Type_commit( &MPI_TIMELOG);
 */
@@ -244,6 +244,8 @@ int main(int argc, char * argv[]) {
     char * path = "";
     char * postfix = alloca(1500);
     int mode = MODE_CREATE;
+    int delfiles = 0;
+    char * buffer = alloca(1500);
     //+++++++++++++++++ Timelog +++++++++++++++++
     char * timelog = alloca(1000);
     double * tlog_ranks = (double *) malloc(sizeof(double)*NTask);
@@ -252,8 +254,11 @@ int main(int argc, char * argv[]) {
     tlog.create = tlog.open = tlog.write = tlog.read = tlog.close = (double *) malloc(sizeof(double)*NTask);
     log * times = malloc(sizeof(log) * NTask);
     
-    while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:p:m:"))) {
+    while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:p:m:d"))) {
         switch(ch) {
+            case 'd':
+                delfiles = 1;
+                break;
             case 'm':
                 if(0 == strcmp(optarg, "read")) {
                     mode = MODE_READ;
@@ -326,18 +331,23 @@ int main(int argc, char * argv[]) {
              NTask, Nwriter, Nwriter, Nwriter, Nwriter, NTask);
         Nwriter = NTask;
     }
-    
+
 //+++++++++++++++++ Starting Simulation +++++++++++++++++
     sim(Nfile, Nwriter, Nitems, filename, tlog_ranks, tlog, times, mode);
-
+//+++++++++++++++++ Deleting files if flag -d set +++++++++++++++++
+    if (delfiles) {
+        sprintf(buffer, "rm -rf %s/*", filename);
+        system(buffer);
+    }
 //+++++++++++++++++ Writing Time Log +++++++++++++++++
     sprintf(timelog, "%s/Timelog%s", filename, postfix);
-    F = fopen(timelog, "a+");
-    if (!F){
-        info("iosim.c: Couldn't open file %s for writting!\n", timelog);
-    }
-    else{
-        if (ThisTask == 0){
+    if (ThisTask == 0){
+        F = fopen(timelog, "a+");
+        if (!F){
+            info("iosim.c: Couldn't open file %s for writting!\n", timelog);
+        }
+        else{
+
             //fprintf(F, "Task\tTwrite\t\tTlog.write\n");
             fprintf(F, "Task\tTcreate\t\tTopen\t\tTwrite\t\tTread\t\tTclose\n");
             for (i=0; i<NTask; i++) {
