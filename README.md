@@ -21,7 +21,7 @@ mpirun -n 64 ./iosim -N 4000 -n 64 -s 800000 -w 3 -p ./ -m create -d Test
  
  -s ... Nitems: sum of items of dim <width> and format 'i4'
  
- -> total number of bytes written in files: Nitems*width*4bytes
+ -> total number of bytes written in files: Nitems x width x 4bytes
  
  -n ... Nwriters: number of writers (should be <= number of ranks)
  
