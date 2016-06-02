@@ -336,8 +336,10 @@ int main(int argc, char * argv[]) {
     sim(Nfile, Nwriter, Nitems, filename, tlog_ranks, tlog, times, mode);
 //+++++++++++++++++ Deleting files if flag -d set +++++++++++++++++
     if (delfiles) {
-        sprintf(buffer, "rm -rf %s/*", filename);
-        system(buffer);
+        if(ThisTask == 0) {
+            sprintf(buffer, "rm -rf %s/*", filename);
+            system(buffer);
+        }
     }
 //+++++++++++++++++ Writing Time Log +++++++++++++++++
     sprintf(timelog, "%s/Timelog%s", filename, postfix);
