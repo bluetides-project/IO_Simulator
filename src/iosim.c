@@ -251,7 +251,11 @@ int main(int argc, char * argv[]) {
     double * tlog_ranks = (double *) malloc(sizeof(double)*NTask);
     FILE *F;
     ptrlog tlog;
-    tlog.create = tlog.open = tlog.write = tlog.read = tlog.close = (double *) malloc(sizeof(double)*NTask);
+    tlog.create = (double *) malloc(sizeof(double)*NTask);
+    tlog.open = (double *) malloc(sizeof(double)*NTask);
+    tlog.write = (double *) malloc(sizeof(double)*NTask);
+    tlog.read = (double *) malloc(sizeof(double)*NTask);
+    tlog.close = (double *) malloc(sizeof(double)*NTask);
     log * times = malloc(sizeof(log) * NTask);
     
     while(-1 != (ch = getopt(argc, argv, "hN:n:s:w:p:m:d"))) {
