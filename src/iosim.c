@@ -123,14 +123,14 @@ sim(int Nfile, int Nwriter, size_t Nitems, char * filename, double * tlog_ranks,
         info("Opening BigFile\n");
         t0 = MPI_Wtime();
         big_file_mpi_open(&bf, filename, MPI_COMM_WORLD);
-        t0 = MPI_Wtime();
+        t1 = MPI_Wtime();
         trank.open += t1 - t0;
         info("Opened BigFile\n");
 
         info("Opening BigBlock\n");
         t0 = MPI_Wtime();
         big_file_mpi_open_block(&bf, &bb, "TestBlock", MPI_COMM_WORLD);
-        t0 = MPI_Wtime();
+        t1 = MPI_Wtime();
         trank.open += t1 - t0;
         info("Opened BigBlock\n");
         if(bb.size != Nitems) {
@@ -320,9 +320,7 @@ int main(int argc, char * argv[]) {
     }
 
 //+++++++++++++++++ Filename and checks of input parameters +++++++++++++++++
-    sprintf(postfix, "_files%d_ranks%d_writers%d_items%td_of_width%d",
-             Nfile, NTask, Nwriter, Nitems, width);
-    sprintf(filename, "%s%s%s", path, argv[optind], postfix);
+    sprintf(filename, "%s%s", path, argv[optind]);
     Nitems *= width;
     if (Nitems % NTask != 0) {
         Nitems -= Nitems % NTask;
@@ -341,21 +339,22 @@ int main(int argc, char * argv[]) {
 //+++++++++++++++++ Deleting files if flag -d set +++++++++++++++++
     if (delfiles) {
         if(ThisTask == 0) {
-            sprintf(buffer, "rm -rf %s/*", filename);
+            sprintf(buffer, "rm -rf %s/TestBlock", filename);
             system(buffer);
         }
     }
 //+++++++++++++++++ Writing Time Log +++++++++++++++++
-    sprintf(timelog, "%s/Timelog%s", filename, postfix);
+    sprintf(timelog, "%s/Timelog", filename);
     if (ThisTask == 0){
         F = fopen(timelog, "a+");
         if (!F){
             info("iosim.c: Couldn't open file %s for writting!\n", timelog);
         }
         else{
-
+            fprintf(F, "# files %d ranks %d writers %d items %td width %d\n",
+                         Nfile, NTask, Nwriter, Nitems, width);
             //fprintf(F, "Task\tTwrite\t\tTlog.write\n");
-            fprintf(F, "Task\tTcreate\t\tTopen\t\tTwrite\t\tTread\t\tTclose\n");
+            fprintf(F, "# Task\tTcreate\t\tTopen\t\tTwrite\t\tTread\t\tTclose\n");
             for (i=0; i<NTask; i++) {
                 //fprintf(F, "%d\t%f\t%f\n", i, tlog_ranks[i], tlog.write[i]);
                 //fprintf(F, "%d\t%f\t%f\t%f\t%f\t%f\n", i, tlog.create[i], tlog.open[i], tlog.write[i], tlog.read[i], tlog.close[i]);
