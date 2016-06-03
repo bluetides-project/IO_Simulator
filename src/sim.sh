@@ -13,7 +13,7 @@
 #PBS -l walltime=00:59:00
 #PBS -q bigmem 
 #   #PBS -l mem=512mb
-#PBS -l nodes=1:ppn=4
+#PBS -l nodes=1:ppn=64
 
 cd $PBS_O_WORKDIR
 
@@ -47,7 +47,7 @@ echo ' '
 ############################################################
 
 
-mpiexec ./iosim -N 81 -n 4 -s 81000 -m create TestFile-81-4-81000
+mpirun -n 64 ./iosim -N 4000 -n 64 -s 800000 -w 1 -p ./ -m create Test
 
 exit
 #
