@@ -1,6 +1,8 @@
 # PAID-IO Optimization of BlueTides
 
-IO_Simulator for the BlueTides Project using the bigfile library
+IO Simulator for the BlueTides Project using the bigfile library
+
+After cloning, run bootstrap.sh to get the submodule content.
 
 Run on COMA:
 
@@ -29,3 +31,4 @@ mpirun -n 64 ./iosim -N 4000 -n 64 -s 800000 -w 3 -p ./ -m create -d Test
  -n ... Nwriters: number of writers (should be <= number of ranks)
  
  -N ... Nfiles: number of files (items are equally subdivided into files)
+

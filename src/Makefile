@@ -1,7 +1,7 @@
 MPICC?=mpicc
 CFLAGS?=-O0 -g
 
-IOSIM_OBJECTS = iosim.o ../bigfile/bigfile.o ../bigfile/bigfile-mpi.o
+IOSIM_OBJECTS = iosim.o ../bigfile/src/bigfile.o ../bigfile/src/bigfile-mpi.o
 
 all : iosim
 
